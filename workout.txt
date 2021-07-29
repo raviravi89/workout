@@ -1,0 +1,7 @@
+project name: Mytestproject 
+
+
+application pools name: Mytestproject
+
+sitepath:
+C:\Users\rattuluri\Desktop\Mytestproject
