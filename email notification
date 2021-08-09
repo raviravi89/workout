@@ -1,0 +1,133 @@
+#!/usr/bin/env groovy
+
+import org.common.*
+import hudson.model.*
+
+
+String buildResultInformation = ""
+boolean buildError = false
+boolean buildUnstable = false
+
+//String slnFile = 'D:\\DotnetMVCGIT\\DonetApplicationGIT\\DonetApplicationGIT.sln'
+//String projFile = "D:\\DotnetMVCGIT\\DonetApplicationGIT\\DonetApplicationGIT.csproj "
+
+String donetApplicationGITsln = "D:\\jekins_workspace\\DotnetMVC\\DonetApplicationGIT\\DonetApplicationGIT.sln"
+String donetApplicationGIT = "D:\\jekins_workspace\\DotnetMVC\\DonetApplicationGIT\\DonetApplicationGIT.csproj"
+String dontnetWebAPI = "D:\\jekins_workspace\\DotnetMVC\\DontnetWebAPI\\DontnetWebAPI.csproj"
+String webApplication1 = "D:\\jekins_workspace\\DotnetMVC\\WebApplication1\\WebApplication1.csproj"
+String webApplication2 = "D:\\jekins_workspace\\DotnetMVC\\WebApplication2\\WebApplication2.csproj"
+String webApplication3 = "D:\\jekins_workspace\\DotnetMVC\\WebApplication3\\WebApplication3.csproj"
+String publishedPath = "D:\\Jenkins\\DotnetMVCOutput"
+String publishedPath1 = "D:\\Jenkins\\DontnetWebAPI"
+String publishedPath2 = "D:\\Jenkins\\WebApplication1"
+String publishedPath3 = "D:\\Jenkins\\WebApplication2"
+String publishedPath4 = "D:\\Jenkins\\WebApplication3"
+
+String conf = "Release"
+String platform = "Any CPU"
+
+String iisApplicationName = "MVCTestApp"
+String iisApplicationPath = "D:\\Jenkins\\DotnetMVCOutput"
+String targetServerIP = "0.0.0.0"
+
+ 
+
+node("master") {
+    try
+    {
+        stage('Cleanup') {
+                step([$class: 'WsCleanup', cleanWhenFailure: true])
+            }
+            
+        stage('Git clone') {
+            //checkout([$class: 'GitSCM', branches: [[name: '${BRANCH_NAME}']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/raviravi89/mytestproject.git']]])
+    	    git branch: '${BRANCH_NAME}', url: 'https://github.com/raviravi89/MVCTestApp.git'
+    	    powershell returnStdout: true, script: ' Copy-Item -Path . D:\\jekins_workspace -Recurse -Force'
+        }
+
+
+        stage("Stop IIS site") {
+           // bat """
+        //     NET STOP W3SVC
+        //    """
+        }
+
+
+        stage("Application backup") {
+            bat """
+                cd "${publishedPath}\\"
+                cd 
+            """
+            powershell """
+                    Write-Output "Taking the application backup"
+                    Copy-Item -Path "$publishedPath\\*" "C:\\tmp\\MVC_project_backup_${BUILD_NUMBER}\\DotnetMVCOutput_bkp_${BUILD_NUMBER}" -Recurse -Force
+					Copy-Item -Path "$publishedPath1\\*" "C:\\tmp\\MVC_project_backup_${BUILD_NUMBER}\\DontnetWebAPI_bkp_${BUILD_NUMBER}" -Recurse -Force
+					Copy-Item -Path "$publishedPath2\\*" "C:\\tmp\\MVC_project_backup_${BUILD_NUMBER}\\WebApplication1_bkp_${BUILD_NUMBER}" -Recurse -Force
+					Copy-Item -Path "$publishedPath3\\*" "C:\\tmp\\MVC_project_backup_${BUILD_NUMBER}\\WebApplication2_bkp_${BUILD_NUMBER}" -Recurse -Force
+					Copy-Item -Path "$publishedPath4\\*" "C:\\tmp\\MVC_project_backup_${BUILD_NUMBER}\\WebApplication3_bkp_${BUILD_NUMBER}" -Recurse -Force					
+                """
+        }
+        
+        stage('Build') {
+            def msBuild = tool(name: 'MSbuild16', type: 'hudson.plugins.msbuild.MsBuildInstallation')
+            bat """
+            "${msBuild}" "${donetApplicationGITsln}" /t:clean;build /p:Configuration=${conf} /p:DeleteExistingFiles=True
+            "${msBuild}" "${donetApplicationGIT}" /p:Configuration=Release /p:Platform=AnyCPU /t:WebPublish /p:WebPublishMethod=FileSystem /p:DeleteExistingFiles=True /p:publishUrl=C:\\tmp\\MVC_project_${BUILD_NUMBER}\\donetApplicationGIT_NEW_${BUILD_NUMBER}\\
+            "${msBuild}" "${dontnetWebAPI}" /p:Configuration=Release /p:Platform=AnyCPU /t:WebPublish /p:WebPublishMethod=FileSystem /p:DeleteExistingFiles=True /p:publishUrl=C:\\tmp\\MVC_project_${BUILD_NUMBER}\\dontnetWebAPI_NEW_${BUILD_NUMBER}\\
+            "${msBuild}" "${webApplication1}" /p:Configuration=Release /p:Platform=AnyCPU /t:WebPublish /p:WebPublishMethod=FileSystem /p:DeleteExistingFiles=True /p:publishUrl=C:\\tmp\\MVC_project_${BUILD_NUMBER}\\webApplication1_NEW_${BUILD_NUMBER}\\
+            "${msBuild}" "${webApplication2}" /p:Configuration=Release /p:Platform=AnyCPU /t:WebPublish /p:WebPublishMethod=FileSystem /p:DeleteExistingFiles=True /p:publishUrl=C:\\tmp\\MVC_project_${BUILD_NUMBER}\\webApplication2_NEW_${BUILD_NUMBER}\\
+            "${msBuild}" "${webApplication3}" /p:Configuration=Release /p:Platform=AnyCPU /t:WebPublish /p:WebPublishMethod=FileSystem /p:DeleteExistingFiles=True /p:publishUrl=C:\\tmp\\MVC_project_${BUILD_NUMBER}\\webApplication3_NEW_${BUILD_NUMBER}\\
+
+             
+           """
+           
+           powershell """
+            Copy-Item -Path "C:\\tmp\\MVC_project_${BUILD_NUMBER}\\donetApplicationGIT_NEW_${BUILD_NUMBER}\\*" "${publishedPath}" -Recurse -Force
+            Copy-Item -Path "C:\\tmp\\MVC_project_${BUILD_NUMBER}\\dontnetWebAPI_NEW_${BUILD_NUMBER}\\*" "${publishedPath1}" -Recurse -Force
+		    Copy-Item -Path "C:\\tmp\\MVC_project_${BUILD_NUMBER}\\webApplication1_NEW_${BUILD_NUMBER}\\*" "${publishedPath2}" -Recurse -Force
+		    Copy-Item -Path "C:\\tmp\\MVC_project_${BUILD_NUMBER}\\webApplication2_NEW_${BUILD_NUMBER}\\*" "${publishedPath3}" -Recurse -Force
+		    Copy-Item -Path "C:\\tmp\\MVC_project_${BUILD_NUMBER}\\webApplication3_NEW_${BUILD_NUMBER}\\*" "${publishedPath4}" -Recurse -Force
+           """
+        }
+        
+        // stage('Deploy') {
+        //     def msDeploy = "C:\\Program Files\\IIS\\Microsoft Web Deploy V3\\msdeploy.exe"
+            
+        //     bat """
+        //      "${msDeploy}" -verb:sync -source:iisApp="${WORKSPACE}\\${publishedPath}" -enableRule:AppOffline -dest:iisApp="${iisApplicationName}",ComputerName="https://${targetServerIP}:8172/msdeploy.axd" -allowUntrusted"""
+        // }
+
+ 
+
+        stage("Start IIS site") {
+            powershell returnStdout: true, script: ' Remove-Item D:\\jekins_workspace\\DotnetMVC -Recurse -Force -Confirm:$false'
+            // bat """
+            //    NET START W3SVC
+            // """
+        }
+    
+        stage("Email Notification") {
+        mail bcc: '', body: 'Email from Jenkins', cc: '', from: '', replyTo: '', subject: 'Build Report', to: 'ravitest1989@gmail.com'
+    }
+    }    
+    catch (e)
+    {
+        echo "${e}"
+        buildError = true
+        buildResultInformation = "${e}"
+        currentBuild.displayName = "Failed-build-" + BUILD_NUMBER
+        currentBuild.result = 'FAILURE'
+    }
+    finally
+    {
+         emailext body: """
+                         <p><strong>Build #${BUILD_NUMBER} is - <span style="color: rgb(235, 107, 86);">Failed</span></strong></p>
+                         <p><strong>Output:</strong> ${BUILD_URL}</p>
+                         <p><strong>Error Occurred: <span style="color: rgb(84, 172, 210);">&nbsp;</span><span style="color: rgb(235, 107, 86);">${buildResultInformation}</span></strong></p>
+                         <p>-------------------------------------------------------</p>""",
+                 subject: 'Build Error',
+                 to: 'ravitest1989@gmail.com'
+            }
+    
+}
+
