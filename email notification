@@ -105,10 +105,6 @@ node("master") {
             //    NET START W3SVC
             // """
         }
-    
-        stage("Email Notification") {
-        mail bcc: '', body: 'Email from Jenkins', cc: '', from: '', replyTo: '', subject: 'Build Report', to: 'ravitest1989@gmail.com'
-    }
     }    
     catch (e)
     {
@@ -120,14 +116,48 @@ node("master") {
     }
     finally
     {
-         emailext body: """
-                         <p><strong>Build #${BUILD_NUMBER} is - <span style="color: rgb(235, 107, 86);">Failed</span></strong></p>
-                         <p><strong>Output:</strong> ${BUILD_URL}</p>
-                         <p><strong>Error Occurred: <span style="color: rgb(84, 172, 210);">&nbsp;</span><span style="color: rgb(235, 107, 86);">${buildResultInformation}</span></strong></p>
-                         <p>-------------------------------------------------------</p>""",
-                 subject: 'Build Error',
-                 to: 'ravitest1989@gmail.com'
-            }
+         if(!buildError){
+            currentBuild.result = 'SUCCESS'
+        }
+        echo "before mail"
+        String emailSubject = "${JOB_NAME} - ${BUILD_DISPLAY_NAME} - ${currentBuild.result}"
+        String emailBody = """<p><strong>Build ${BUILD_NUMBER} is - <span style="color: rgb(247, 218, 100);">${currentBuild.result}</span></strong></p>
+                    <p><strong>Output:</strong> ${BUILD_URL}</p>
+                    <p><strong>Issue Occurred: <span style="color: rgb(84, 172, 210);">&nbsp;</span><span style="color: rgb(235, 107, 86);">${buildResultInformation}</span></strong></p>
+                    <p><strong>Changelog:</strong><br>${change}</p>"""
+        echo emailBody     
+        echo emailSubject
+        
+        emailext attachLog: true, body: emailBody,
+                    subject: emailSubject,
+                    to: 'ravitest1989@gmail.com'
+    }
     
 }
 
+String getChangeString()
+{
+    echo("Gathering SCM changes")
+
+    String changeString = ""
+    def changeLogSets = currentBuild.changeSets
+
+    for (int i = 0; i < changeLogSets.size(); i++)
+    {
+        def entries = changeLogSets[i].items
+        for (int j = 0; j < entries.length; j++)
+        {
+            def entry = entries[j]
+            changeString += " - [${entry.author}] ${entry.msg.take(100)} \n"
+        }
+    }
+
+    if (!changeString)
+    {
+        changeString = " - No new changes in Git- "
+    }
+
+    echo(changeString)
+
+    return changeString
+}
